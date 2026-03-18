@@ -313,6 +313,9 @@ CREATE TABLE IF NOT EXISTS company_settings (
   signature_url TEXT,
   theme TEXT DEFAULT 'light',
   menu_order TEXT[],
+  hidden_tiles TEXT[],
+  dashboard_tile_sizes JSONB DEFAULT '{}'::jsonb,
+  dashboard_tile_order TEXT[],
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

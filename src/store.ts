@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -355,6 +354,8 @@ interface AppState {
   isAuthenticated: boolean;
   menuOrder: string[];
   hiddenTiles: string[];
+  dashboardTileSizes: Record<string, 'small' | 'medium' | 'large'>;
+  dashboardTileOrder: string[];
   isLoading: boolean;
   
   fetchInitialData: () => Promise<void>;
@@ -362,7 +363,9 @@ interface AppState {
   setCompanySignature: (signature: string | null) => Promise<void>;
   setCompanyData: (data: CompanyData) => Promise<void>;
   setMenuOrder: (order: string[]) => Promise<void>;
-  toggleTileVisibility: (tileId: string) => void;
+  toggleTileVisibility: (tileId: string) => Promise<void>;
+  setDashboardTileSizes: (sizes: Record<string, 'small' | 'medium' | 'large'>) => Promise<void>;
+  setDashboardTileOrder: (order: string[]) => Promise<void>;
   toggleTheme: () => Promise<void>;
   login: (user: string, pass: string) => boolean;
   logout: () => void;
@@ -453,9 +456,8 @@ interface AppState {
 }
 
 export const useStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      clients: [],
+  (set, get) => ({
+    clients: [],
       checklistItems: [],
       tickets: [],
       quotes: [],
@@ -493,6 +495,8 @@ export const useStore = create<AppState>()(
       isAuthenticated: false,
       menuOrder: ['dashboard', 'accountability', 'consumption', 'clients', 'products', 'supplies', 'tickets', 'kanban', 'quotes', 'receipts', 'financial', 'calendar', 'settings'],
       hiddenTiles: [],
+      dashboardTileSizes: {},
+      dashboardTileOrder: [],
       isLoading: false,
       
       fetchInitialData: async () => {
@@ -859,6 +863,15 @@ export const useStore = create<AppState>()(
             if (companySettingsData.menu_order) {
               newState.menuOrder = companySettingsData.menu_order;
             }
+            if (companySettingsData.hidden_tiles) {
+              newState.hiddenTiles = companySettingsData.hidden_tiles;
+            }
+            if (companySettingsData.dashboard_tile_sizes) {
+              newState.dashboardTileSizes = companySettingsData.dashboard_tile_sizes;
+            }
+            if (companySettingsData.dashboard_tile_order) {
+              newState.dashboardTileOrder = companySettingsData.dashboard_tile_order;
+            }
           }
 
           set(newState);
@@ -912,11 +925,37 @@ export const useStore = create<AppState>()(
           } catch (e) { console.error(e); }
         }
       },
-      toggleTileVisibility: (tileId) => set((state) => ({
-        hiddenTiles: state.hiddenTiles.includes(tileId)
+      toggleTileVisibility: async (tileId) => {
+        const state = get();
+        const newHiddenTiles = state.hiddenTiles.includes(tileId)
           ? state.hiddenTiles.filter(id => id !== tileId)
-          : [...state.hiddenTiles, tileId]
-      })),
+          : [...state.hiddenTiles, tileId];
+        set({ hiddenTiles: newHiddenTiles });
+        const id = state.companySettingsId;
+        if (id) {
+          try {
+            await supabase.from('company_settings').update({ hidden_tiles: newHiddenTiles }).eq('id', id);
+          } catch (e) { console.error(e); }
+        }
+      },
+      setDashboardTileSizes: async (sizes) => {
+        set({ dashboardTileSizes: sizes });
+        const id = get().companySettingsId;
+        if (id) {
+          try {
+            await supabase.from('company_settings').update({ dashboard_tile_sizes: sizes }).eq('id', id);
+          } catch (e) { console.error(e); }
+        }
+      },
+      setDashboardTileOrder: async (order) => {
+        set({ dashboardTileOrder: order });
+        const id = get().companySettingsId;
+        if (id) {
+          try {
+            await supabase.from('company_settings').update({ dashboard_tile_order: order }).eq('id', id);
+          } catch (e) { console.error(e); }
+        }
+      },
       toggleTheme: async () => {
         const newTheme = get().theme === 'light' ? 'dark' : 'light';
         set({ theme: newTheme });
@@ -2175,10 +2214,8 @@ export const useStore = create<AppState>()(
         theme: data.theme || state.theme,
         menuOrder: data.menuOrder || state.menuOrder,
         hiddenTiles: data.hiddenTiles || state.hiddenTiles,
+        dashboardTileSizes: data.dashboardTileSizes || state.dashboardTileSizes,
+        dashboardTileOrder: data.dashboardTileOrder || state.dashboardTileOrder,
       })),
-    }),
-    {
-      name: 'manutencao-storage',
-    }
-  )
+  })
 );

@@ -149,7 +149,7 @@ export default function Dashboard() {
     notifications, supplyItems, payments, notices,
     packages, visitors, criticalEvents, energyData, logout,
     hiddenTiles, toggleTileVisibility, companySignature, companyData,
-    assemblies
+    assemblies, dashboardTileSizes, dashboardTileOrder, setDashboardTileSizes, setDashboardTileOrder
   } = useStore();
 
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -740,31 +740,35 @@ export default function Dashboard() {
     }
   ];
 
-  const [tileSizes, setTileSizes] = useState<Record<string, 'small' | 'medium' | 'large'>>(() => {
-    const saved = localStorage.getItem('dashboardTileSizes');
-    if (saved) return JSON.parse(saved);
-    return {};
-  });
+  const [tileSizes, setTileSizes] = useState<Record<string, 'small' | 'medium' | 'large'>>(dashboardTileSizes);
 
   const [tiles, setTiles] = useState<TileData[]>(() => {
-    const savedOrder = localStorage.getItem('dashboardTileOrder');
-    if (savedOrder) {
-      const order = JSON.parse(savedOrder) as string[];
-      return order.map(id => initialTiles.find(t => t.id === id)).filter(Boolean) as TileData[];
+    if (dashboardTileOrder && dashboardTileOrder.length > 0) {
+      return dashboardTileOrder.map(id => initialTiles.find(t => t.id === id)).filter(Boolean) as TileData[];
     }
     return initialTiles;
   });
 
+  // Sync tile sizes when store changes
+  useEffect(() => {
+    setTileSizes(dashboardTileSizes);
+  }, [dashboardTileSizes]);
+
+  // Sync tiles order when store changes
+  useEffect(() => {
+    if (dashboardTileOrder && dashboardTileOrder.length > 0) {
+      setTiles(dashboardTileOrder.map(id => initialTiles.find(t => t.id === id)).filter(Boolean) as TileData[]);
+    }
+  }, [dashboardTileOrder]);
+
   const handleResize = (id: string, defaultType: 'wide' | 'square', e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setTileSizes(prev => {
-      const currentSize = prev[id] || (defaultType === 'wide' ? 'medium' : 'small');
-      const nextSize: 'small' | 'medium' | 'large' = currentSize === 'small' ? 'medium' : currentSize === 'medium' ? 'large' : 'small';
-      const newSizes = { ...prev, [id]: nextSize };
-      localStorage.setItem('dashboardTileSizes', JSON.stringify(newSizes));
-      return newSizes;
-    });
+    const currentSize = tileSizes[id] || (defaultType === 'wide' ? 'medium' : 'small');
+    const nextSize: 'small' | 'medium' | 'large' = currentSize === 'small' ? 'medium' : currentSize === 'medium' ? 'large' : 'small';
+    const newSizes = { ...tileSizes, [id]: nextSize };
+    setTileSizes(newSizes);
+    setDashboardTileSizes(newSizes);
   };
 
   // Sincronizar dados dinâmicos nos tiles quando o store mudar
@@ -838,7 +842,7 @@ export default function Dashboard() {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
         const newItems = arrayMove(items, oldIndex, newIndex);
-        localStorage.setItem('dashboardTileOrder', JSON.stringify(newItems.map(t => t.id)));
+        setDashboardTileOrder(newItems.map(t => t.id));
         return newItems;
       });
     }
